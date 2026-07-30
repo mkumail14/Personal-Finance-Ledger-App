@@ -1,11 +1,14 @@
 import React from 'react';
 import { formatPKR } from '../lib/utils';
-import { Wallet, Landmark, CreditCard, Box, TrendingUp } from 'lucide-react';
+import { Wallet, Landmark, CreditCard, Box, TrendingUp, ScrollText } from 'lucide-react';
 
 export default function AccountsDashboard({ accounts, receivablesTotal }) {
   const totalAssets = accounts.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
   const totalAvailable = accounts
-    .filter(acc => !acc.name.toLowerCase().includes('baba'))
+    .filter(acc => {
+      const name = acc.name.toLowerCase();
+      return !name.includes('baba') && !name.includes('bond');
+    })
     .reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
 
   const getAccountIcon = (name) => {
@@ -13,6 +16,7 @@ export default function AccountsDashboard({ accounts, receivablesTotal }) {
     if (lower.includes('bank')) return <Landmark size={18} className="text-[#0ea5e9]" />;
     if (lower.includes('card')) return <CreditCard size={18} className="text-[#0ea5e9]" />;
     if (lower.includes('cupboard') || lower.includes('safe')) return <Box size={18} className="text-[#0ea5e9]" />;
+    if (lower.includes('bond')) return <ScrollText size={18} className="text-[#0ea5e9]" />;
     return <Wallet size={18} className="text-[#0ea5e9]" />;
   };
 
