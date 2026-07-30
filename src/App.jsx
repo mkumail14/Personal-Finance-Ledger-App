@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import AccountsDashboard from './components/AccountsDashboard';
 import Ledger from './components/Ledger';
+import DirectTransaction from './components/DirectTransaction';
+import TransactionHistory from './components/TransactionHistory';
 import { formatPKR } from './lib/utils';
 import { PenTool, Lock } from 'lucide-react';
-import { collection, onSnapshot, addDoc, doc, writeBatch, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, writeBatch, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
 
 function App() {
@@ -13,6 +15,7 @@ function App() {
 
   const [accounts, setAccounts] = useState([]);
   const [ledgers, setLedgers] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,11 +29,17 @@ function App() {
       setLedgers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    const q = query(collection(db, 'Transactions'), orderBy('timestamp', 'desc'));
+    const unsubTransactions = onSnapshot(q, (snapshot) => {
+      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     setLoading(false);
 
     return () => {
       unsubAccounts();
       unsubLedgers();
+      unsubTransactions();
     };
   }, [isAuthenticated]);
 
@@ -53,13 +62,29 @@ function App() {
              && l.status === 'Pending'
       );
 
+      const totalNewAmount = newItem.entries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+      const batch = writeBatch(db);
+
       if (existing) {
         const ref = doc(db, 'Ledgers', existing.id);
         const updatedEntries = [...(existing.entries || []), ...newItem.entries];
-        await updateDoc(ref, { entries: updatedEntries });
+        batch.update(ref, { entries: updatedEntries });
       } else {
-        await addDoc(collection(db, 'Ledgers'), newItem);
+        const ref = doc(collection(db, 'Ledgers'));
+        batch.set(ref, newItem);
       }
+
+      // Log transaction
+      const transRef = doc(collection(db, 'Transactions'));
+      batch.set(transRef, {
+        type: 'Add Ledger',
+        amount: totalNewAmount,
+        description: `Added pending ${newItem.type} for ${newItem.person_name}`,
+        timestamp: serverTimestamp()
+      });
+
+      await batch.commit();
     } catch (err) {
       console.error("Error adding document: ", err);
       alert("Failed to add ledger item.");
@@ -83,11 +108,46 @@ function App() {
       
       const accountRef = doc(db, 'Accounts', accountId);
       batch.update(accountRef, { balance: acc.balance + adjustment });
+
+      // Log transaction
+      const transRef = doc(collection(db, 'Transactions'));
+      batch.set(transRef, {
+        type: 'Settle',
+        amount: totalAmount,
+        description: `Settled ${item.type} for ${item.person_name}`,
+        accountId: accountId,
+        timestamp: serverTimestamp()
+      });
       
       await batch.commit();
     } catch (err) {
       console.error("Error settling account: ", err);
       alert("Failed to settle account.");
+    }
+  };
+
+  const handleDirectTransaction = async (data) => {
+    try {
+      const acc = accounts.find(a => a.id === data.accountId);
+      if (!acc) return;
+
+      const adjustment = data.type === 'Credit' ? data.amount : -data.amount;
+
+      const batch = writeBatch(db);
+      
+      const accountRef = doc(db, 'Accounts', data.accountId);
+      batch.update(accountRef, { balance: acc.balance + adjustment });
+
+      const transRef = doc(collection(db, 'Transactions'));
+      batch.set(transRef, {
+        ...data,
+        timestamp: serverTimestamp()
+      });
+
+      await batch.commit();
+    } catch (err) {
+      console.error("Error applying direct transaction: ", err);
+      alert("Failed to process transaction.");
     }
   };
 
@@ -164,6 +224,8 @@ function App() {
       <main>
         <AccountsDashboard accounts={accounts} receivablesTotal={pendingReceivables} />
         
+        <DirectTransaction accounts={accounts} onTransaction={handleDirectTransaction} />
+
         <div className="grid md:grid-cols-2 gap-8 md:gap-12">
           <Ledger 
             title="Dues (Receivables)" 
@@ -182,6 +244,8 @@ function App() {
             onSettle={handleSettle}
           />
         </div>
+
+        <TransactionHistory transactions={transactions} accounts={accounts} />
       </main>
     </div>
   );
