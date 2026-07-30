@@ -1,18 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { seedAccounts, seedLedgers } from './data/seedData';
 import AccountsDashboard from './components/AccountsDashboard';
 import Ledger from './components/Ledger';
 import { formatPKR } from './lib/utils';
-import { PenTool, Database } from 'lucide-react';
+import { PenTool, Lock } from 'lucide-react';
 import { collection, onSnapshot, addDoc, doc, writeBatch, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState(false);
+
   const [accounts, setAccounts] = useState([]);
   const [ledgers, setLedgers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const unsubAccounts = onSnapshot(collection(db, 'Accounts'), (snapshot) => {
       setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -27,7 +32,18 @@ function App() {
       unsubAccounts();
       unsubLedgers();
     };
-  }, []);
+  }, [isAuthenticated]);
+
+  const handlePinSubmit = (e) => {
+    e.preventDefault();
+    if (pin === '2406') {
+      setIsAuthenticated(true);
+      setPinError(false);
+    } else {
+      setPinError(true);
+      setPin('');
+    }
+  };
 
   const handleAddLedger = async (newItem) => {
     try {
@@ -75,27 +91,40 @@ function App() {
     }
   };
 
-  const handleSeedDatabase = async () => {
-    try {
-      const batch = writeBatch(db);
-      
-      seedAccounts.forEach(acc => {
-        const ref = doc(collection(db, 'Accounts'));
-        batch.set(ref, { name: acc.name, balance: acc.balance });
-      });
-      
-      seedLedgers.forEach(l => {
-        const ref = doc(collection(db, 'Ledgers'));
-        batch.set(ref, { person_name: l.person_name, type: l.type, entries: l.entries || [], status: l.status });
-      });
-      
-      await batch.commit();
-      alert('Database seeded successfully!');
-    } catch (err) {
-      console.error("Error seeding database: ", err);
-      alert("Failed to seed database. Check Firestore rules.");
-    }
-  };
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="bg-[#1a1a1a] p-8 rounded-2xl border border-[#333333] w-full max-w-sm shadow-xl flex flex-col items-center">
+          <div className="w-16 h-16 bg-[#222222] rounded-full flex items-center justify-center mb-6">
+            <Lock className="text-[#0ea5e9]" size={32} />
+          </div>
+          <h1 className="text-2xl font-light text-white mb-2">Ledger Note</h1>
+          <p className="text-gray-500 text-sm mb-8 text-center">Enter PIN to access your finance ledger</p>
+          
+          <form onSubmit={handlePinSubmit} className="w-full flex flex-col gap-4">
+            <input 
+              type="password" 
+              value={pin}
+              onChange={e => {
+                setPin(e.target.value);
+                setPinError(false);
+              }}
+              placeholder="Enter PIN"
+              className={`w-full bg-black border ${pinError ? 'border-red-500' : 'border-[#333333] focus:border-[#0ea5e9]'} rounded-xl px-4 py-3 text-center text-xl tracking-widest text-white transition-colors focus:outline-none font-mono`}
+              autoFocus
+            />
+            {pinError && <p className="text-red-500 text-xs text-center">Incorrect PIN. Try again.</p>}
+            <button 
+              type="submit"
+              className="w-full bg-[#0ea5e9] text-white rounded-xl py-3 font-medium hover:bg-sky-400 transition-colors mt-2"
+            >
+              Unlock
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading ledger...</div>;
@@ -123,16 +152,6 @@ function App() {
         </div>
         
         <div className="flex items-center gap-6">
-          {accounts.length === 0 && (
-            <button 
-              onClick={handleSeedDatabase}
-              className="flex items-center gap-2 text-xs bg-notepad-accent/10 text-notepad-accent border border-notepad-accent/20 px-3 py-1.5 rounded-md hover:bg-notepad-accent/20 transition-colors"
-            >
-              <Database size={14} />
-              Seed DB
-            </button>
-          )}
-          
           <div className="text-right">
             <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Net Outstanding</p>
             <p className={`font-mono text-xl font-medium px-3 py-1 rounded-md bg-notepad-paper border border-notepad-line ${netPending >= 0 ? 'text-notepad-positive' : 'text-notepad-negative'}`}>
