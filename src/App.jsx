@@ -126,6 +126,71 @@ function App() {
     }
   };
 
+  const handleDeleteLedger = async (ledgerId) => {
+    try {
+      const item = ledgers.find(l => l.id === ledgerId);
+      if (!item) return;
+
+      if (!window.confirm(`Are you sure you want to completely delete the pending ledger for ${item.person_name}?`)) return;
+
+      const totalAmount = (item.entries || []).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+      
+      const batch = writeBatch(db);
+      
+      const ledgerRef = doc(db, 'Ledgers', ledgerId);
+      batch.delete(ledgerRef);
+
+      const transRef = doc(collection(db, 'Transactions'));
+      batch.set(transRef, {
+        type: 'Delete Ledger',
+        amount: totalAmount,
+        description: `Deleted pending ${item.type} for ${item.person_name}`,
+        timestamp: serverTimestamp()
+      });
+
+      await batch.commit();
+    } catch (err) {
+      console.error("Error deleting ledger: ", err);
+      alert("Failed to delete ledger item.");
+    }
+  };
+
+  const handleDeleteEntry = async (ledgerId, entryId) => {
+    try {
+      const item = ledgers.find(l => l.id === ledgerId);
+      if (!item) return;
+
+      const entry = item.entries?.find(e => e.id === entryId);
+      if (!entry) return;
+
+      if (!window.confirm(`Are you sure you want to delete '${entry.desc}' from ${item.person_name}?`)) return;
+
+      const newEntries = item.entries.filter(e => e.id !== entryId);
+      
+      const batch = writeBatch(db);
+      const ledgerRef = doc(db, 'Ledgers', ledgerId);
+      
+      if (newEntries.length === 0) {
+        batch.delete(ledgerRef);
+      } else {
+        batch.update(ledgerRef, { entries: newEntries });
+      }
+
+      const transRef = doc(collection(db, 'Transactions'));
+      batch.set(transRef, {
+        type: 'Delete Entry',
+        amount: entry.amount,
+        description: `Deleted entry '${entry.desc}' from ${item.person_name}`,
+        timestamp: serverTimestamp()
+      });
+
+      await batch.commit();
+    } catch (err) {
+      console.error("Error deleting entry: ", err);
+      alert("Failed to delete entry.");
+    }
+  };
+
   const handleDirectTransaction = async (data) => {
     try {
       const acc = accounts.find(a => a.id === data.accountId);
@@ -234,6 +299,8 @@ function App() {
             accounts={accounts}
             onAdd={handleAddLedger}
             onSettle={handleSettle}
+            onDelete={handleDeleteLedger}
+            onDeleteEntry={handleDeleteEntry}
           />
           <Ledger 
             title="To Pay (Payables)" 
@@ -242,6 +309,8 @@ function App() {
             accounts={accounts}
             onAdd={handleAddLedger}
             onSettle={handleSettle}
+            onDelete={handleDeleteLedger}
+            onDeleteEntry={handleDeleteEntry}
           />
         </div>
 

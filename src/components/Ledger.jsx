@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { formatPKR, cn } from '../lib/utils';
 import SmartInput from './SmartInput';
-import { CheckCircle2, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { evaluate } from 'mathjs';
 
-export default function Ledger({ title, type, items, onAdd, onSettle, accounts }) {
+export default function Ledger({ title, type, items, onAdd, onSettle, onDelete, onDeleteEntry, accounts }) {
   const [settleItemId, setSettleItemId] = useState(null);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [expandedId, setExpandedId] = useState(null);
@@ -94,13 +94,22 @@ export default function Ledger({ title, type, items, onAdd, onSettle, accounts }
                 {isExpanded && (
                   <div className="mt-4 pt-3 border-t border-[#333333]/50 pl-6 flex flex-col gap-2">
                     {(item.entries || []).map(entry => (
-                      <div key={entry.id} className="flex justify-between text-sm">
+                      <div key={entry.id} className="flex justify-between items-center text-sm group">
                         <span className="text-gray-400">{entry.desc}</span>
-                        <span className="font-mono text-gray-300">{formatPKR(entry.amount)}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-gray-300">{formatPKR(entry.amount)}</span>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onDeleteEntry(item.id, entry.id); }}
+                            className="text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
+                            title="Delete Entry"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     
-                    <form onSubmit={(e) => handleMiniSubmit(e, item)} className="flex gap-2 items-center mt-2">
+                    <form onSubmit={(e) => handleMiniSubmit(e, item)} className="flex gap-2 items-center mt-2 pr-6">
                       <input 
                         type="text" 
                         placeholder="Desc (e.g. Shampoo)" 
@@ -122,7 +131,7 @@ export default function Ledger({ title, type, items, onAdd, onSettle, accounts }
                   </div>
                 )}
                 
-                <div className="flex justify-end mt-4">
+                <div className="flex justify-end items-center mt-4">
                   {settleItemId === item.id ? (
                     <div className="flex gap-3 items-center text-sm">
                       <select 
@@ -150,12 +159,21 @@ export default function Ledger({ title, type, items, onAdd, onSettle, accounts }
                       </button>
                     </div>
                   ) : (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setSettleItemId(item.id); }}
-                      className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-white transition-colors font-sans"
-                    >
-                      <CheckCircle2 size={14} /> Settle Total
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+                        className="flex items-center gap-1.5 text-[13px] text-gray-600 hover:text-red-500 transition-colors font-sans"
+                        title="Delete Entire Ledger"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setSettleItemId(item.id); }}
+                        className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-white transition-colors font-sans"
+                      >
+                        <CheckCircle2 size={14} /> Settle Total
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
