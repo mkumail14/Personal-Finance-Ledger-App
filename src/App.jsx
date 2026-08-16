@@ -101,6 +101,11 @@ function App() {
     try {
       const adjustment = item.type === 'Receivable' ? totalAmount : -totalAmount;
       
+      if (acc.balance + adjustment < 0) {
+        alert(`Insufficient balance in ${acc.name} to settle this payable. You need ${formatPKR(totalAmount)} but the balance is only ${formatPKR(acc.balance)}.`);
+        return;
+      }
+
       const batch = writeBatch(db);
       
       const ledgerRef = doc(db, 'Ledgers', ledgerId);
@@ -197,6 +202,11 @@ function App() {
       if (!acc) return;
 
       const adjustment = data.type === 'Credit' ? data.amount : -data.amount;
+
+      if (acc.balance + adjustment < 0) {
+        alert(`Insufficient balance in ${acc.name}. You are trying to debit ${formatPKR(data.amount)} but the balance is only ${formatPKR(acc.balance)}.`);
+        return;
+      }
 
       const batch = writeBatch(db);
       
