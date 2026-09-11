@@ -3,6 +3,7 @@ import AccountsDashboard from './components/AccountsDashboard';
 import Ledger from './components/Ledger';
 import DirectTransaction from './components/DirectTransaction';
 import TransactionHistory from './components/TransactionHistory';
+import Analytics from './components/Analytics';
 import { formatPKR } from './lib/utils';
 import { PenTool, Lock } from 'lucide-react';
 import { collection, onSnapshot, addDoc, doc, writeBatch, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
@@ -12,6 +13,8 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
+
+  const [currentTab, setCurrentTab] = useState('Dashboard');
 
   const [accounts, setAccounts] = useState([]);
   const [ledgers, setLedgers] = useState([]);
@@ -278,12 +281,29 @@ function App() {
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
-      <header className="flex items-center justify-between mb-8 pb-4 border-b border-notepad-line">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-notepad-paper rounded-lg border border-notepad-line">
-            <PenTool className="text-notepad-accent" size={24} />
+      <header className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 pb-4 border-b border-notepad-line gap-4">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-notepad-paper rounded-lg border border-notepad-line">
+              <PenTool className="text-notepad-accent" size={24} />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-white hidden md:block">Ledger Note</h1>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Ledger Note</h1>
+          
+          <div className="flex bg-[#1a1a1a] border border-[#333] rounded-lg p-1">
+            <button
+              onClick={() => setCurrentTab('Dashboard')}
+              className={`px-4 py-1.5 text-sm rounded-md transition-colors ${currentTab === 'Dashboard' ? 'bg-[#0ea5e9] text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setCurrentTab('Analytics')}
+              className={`px-4 py-1.5 text-sm rounded-md transition-colors ${currentTab === 'Analytics' ? 'bg-[#0ea5e9] text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Analytics
+            </button>
+          </div>
         </div>
         
         <div className="flex items-center gap-6">
@@ -297,34 +317,40 @@ function App() {
       </header>
 
       <main>
-        <AccountsDashboard accounts={accounts} receivablesTotal={pendingReceivables} />
-        
-        <DirectTransaction accounts={accounts} onTransaction={handleDirectTransaction} />
+        {currentTab === 'Dashboard' ? (
+          <>
+            <AccountsDashboard accounts={accounts} receivablesTotal={pendingReceivables} />
+            
+            <DirectTransaction accounts={accounts} onTransaction={handleDirectTransaction} />
 
-        <div className="grid md:grid-cols-2 gap-8 md:gap-12">
-          <Ledger 
-            title="Dues (Receivables)" 
-            type="Receivable" 
-            items={ledgers} 
-            accounts={accounts}
-            onAdd={handleAddLedger}
-            onSettle={handleSettle}
-            onDelete={handleDeleteLedger}
-            onDeleteEntry={handleDeleteEntry}
-          />
-          <Ledger 
-            title="To Pay (Payables)" 
-            type="Payable" 
-            items={ledgers} 
-            accounts={accounts}
-            onAdd={handleAddLedger}
-            onSettle={handleSettle}
-            onDelete={handleDeleteLedger}
-            onDeleteEntry={handleDeleteEntry}
-          />
-        </div>
+            <div className="grid md:grid-cols-2 gap-8 md:gap-12">
+              <Ledger 
+                title="Dues (Receivables)" 
+                type="Receivable" 
+                items={ledgers} 
+                accounts={accounts}
+                onAdd={handleAddLedger}
+                onSettle={handleSettle}
+                onDelete={handleDeleteLedger}
+                onDeleteEntry={handleDeleteEntry}
+              />
+              <Ledger 
+                title="To Pay (Payables)" 
+                type="Payable" 
+                items={ledgers} 
+                accounts={accounts}
+                onAdd={handleAddLedger}
+                onSettle={handleSettle}
+                onDelete={handleDeleteLedger}
+                onDeleteEntry={handleDeleteEntry}
+              />
+            </div>
 
-        <TransactionHistory transactions={transactions} accounts={accounts} />
+            <TransactionHistory transactions={transactions} accounts={accounts} />
+          </>
+        ) : (
+          <Analytics transactions={transactions} />
+        )}
       </main>
     </div>
   );
